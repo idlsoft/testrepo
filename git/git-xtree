@@ -1,0 +1,52 @@
+#!/bin/sh
+# Tcl ignores the next line -*- tcl -*- \
+#exec wish "$0" -- "$@"
+if [ -z "$1" ]; then
+	echo "xtree action [subtree]"
+	exit
+fi
+
+PATH=$PATH:$(git --exec-path)
+. git-sh-setup
+require_work_tree
+
+action=$1
+name=$2
+prefix=$name
+shift
+shift
+case "$action" in
+	list)
+	git config -f .gitxtrees --get-regexp subtree.*.url | sed "s_^subtree.__" | sed "s_.url _\t: _"
+	;;
+	add)
+	ref=$1
+	shift
+	[ ! -z "$1" ] && ref="$ref $1"
+	[ -z "$ref" ] && echo "add prefix ref!" && exit 1
+	echo git-subtree --squash add --prefix=$prefix $ref
+	rc=$?
+	[ $rc != 0 ] && exit $rc
+	#git config -f .gitxtrees --remove-section subtree."$name"
+	#git config -f .gitxtrees --replace-all subtree."$name"."prefix" $prefix
+	git config -f .gitxtrees --replace-all subtree."$name"."url" "$ref"
+	echo "Done!"
+	;;
+	pull|push|merge)
+	if [ -z "$name" ]; then
+		echo "Unspecified name"
+		exit 1
+	fi
+	#prefix=$(git config -f .gitxtrees subtree."$name"."prefix")
+	url=$(git config -f .gitxtrees subtree."$name"."url")
+	echo git-subtree --squash $action --prefix=$prefix $url $*
+	;;
+	edit)
+	git config -f .gitxtrees --edit
+	;;
+	*)
+	die "Unknown action $action"	
+	;;
+esac
+
+
